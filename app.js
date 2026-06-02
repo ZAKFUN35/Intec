@@ -1,13 +1,28 @@
 // ============================================================
-//  НАСТРОЙКИ: ТЕМЫ И ЯЗЫКИ
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И DOM-ЭЛЕМЕНТЫ (ВЕРХНИЙ УРОВЕНЬ)
 // ============================================================
 const rootTheme = document.documentElement;
 let currentCanvasColor = '231, 231, 231';
 let currentLang = localStorage.getItem('rl-lang') || 'en';
+let currentHash = ''; // Теперь объявлено до любого использования!
+
+const dynamicContent = document.getElementById('dynamicContent');
+const bcPageNameEn = document.getElementById('bcPageNameEn');
+const bcPageNameRu = document.getElementById('bcPageNameRu');
 
 const themeBtns = document.querySelectorAll('.theme-group .toggle-btn');
 const langBtns = document.querySelectorAll('.lang-group .toggle-btn');
 const sysMedia = window.matchMedia('(prefers-color-scheme: light)');
+
+// ============================================================
+//  НАСТРОЙКИ: ТЕМЫ И ЯЗЫКИ
+// ============================================================
+function updateBreadcrumbsTitle() {
+    if (typeof PAGE_TITLES !== 'undefined' && PAGE_TITLES[currentHash]) {
+        if(bcPageNameEn) bcPageNameEn.textContent = PAGE_TITLES[currentHash].en;
+        if(bcPageNameRu) bcPageNameRu.textContent = PAGE_TITLES[currentHash].ru;
+    }
+}
 
 function applyTheme(themeVal) {
     let isLight = themeVal === 'system' ? sysMedia.matches : themeVal === 'light';
@@ -22,6 +37,7 @@ function applyLang(langVal) {
     rootTheme.setAttribute('lang', langVal);
     try { localStorage.setItem('rl-lang', langVal); } catch(e) {}
     langBtns.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-lang-val') === langVal));
+    
     updateBreadcrumbsTitle();
     
     const searchInput = document.getElementById('searchInput');
@@ -32,50 +48,44 @@ themeBtns.forEach(btn => btn.addEventListener('click', () => applyTheme(btn.getA
 langBtns.forEach(btn => btn.addEventListener('click', () => applyLang(btn.getAttribute('data-lang-val'))));
 sysMedia.addEventListener('change', () => { if ((localStorage.getItem('rl-theme') || 'system') === 'system') applyTheme('system'); });
 
+// Инициализация при старте скрипта
 applyTheme(localStorage.getItem('rl-theme') || 'system');
 applyLang(currentLang);
 
 // ============================================================
 //  РОУТЕР (SPA) И РЕНДЕР КАРТОЧЕК
 // ============================================================
-const dynamicContent = document.getElementById('dynamicContent');
-const bcPageNameEn = document.getElementById('bcPageNameEn');
-const bcPageNameRu = document.getElementById('bcPageNameRu');
-let currentHash = '';
-
-function updateBreadcrumbsTitle() {
-    if (typeof PAGE_TITLES !== 'undefined' && PAGE_TITLES[currentHash]) {
-        if(bcPageNameEn) bcPageNameEn.textContent = PAGE_TITLES[currentHash].en;
-        if(bcPageNameRu) bcPageNameRu.textContent = PAGE_TITLES[currentHash].ru;
-    }
-}
-
 function loadPage(hash) {
-    // Защита, если хэш кривой
+    // 1. Очистка старой страницы (ставим видео ТВ на паузу, если уходим с вкладки)
+    if (currentHash === 'rltv' && typeof appRLTV !== 'undefined' && appRLTV.video) {
+        appRLTV.video.pause();
+    }
+
+    // 2. Защита, если хэш кривой
     if (!PAGE_CONTENT[hash]) hash = 'rl'; 
     currentHash = hash;
     
-    // Вставляем HTML из базы content.js
+    // 3. Вставляем HTML из базы content.js
     if (dynamicContent) {
         dynamicContent.innerHTML = PAGE_CONTENT[hash];
     }
     
     updateBreadcrumbsTitle();
     
-    // Подсвечиваем нужное меню
+    // 4. Подсвечиваем нужное меню
     document.querySelectorAll('.sidebar a.nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-target') === hash);
     });
 
-    // Обнуляем скролл
+    // 5. Обнуляем скролл
     panelOffset = 0;
     setPanelOffset(0);
 
-    // Запускаем специфичную логику страницы (Телевизор или Патчноуты)
+    // 6. Запускаем специфичную логику страницы (Телевизор или Патчноуты)
     if (hash === 'rltv' && typeof appRLTV !== 'undefined') appRLTV.init();
     if (hash === 'patchnotes') initPatchnotesUI();
     
-    // Перезапускаем анимации канвасов
+    // 7. Перезапускаем анимации канвасов
     initCanvases();
 }
 
@@ -171,20 +181,17 @@ function drawConsoles() {
             for (let iy = 0; iy < consDots; iy++) {
                 let x = ix * consStep + consStep / 2; let y = iy * consStep + consStep / 2; let nx = (ix / (consDots - 1)) * 2 - 1; let ny = (iy / (consDots - 1)) * 2 - 1; let dist = Math.sqrt(nx*nx + ny*ny); let alpha = 0.1; 
                 
-                // RL
                 if (c.type === 'storm') { let progress = (Math.sin(t * 0.8) + 1) / 2; let safeRadius = progress * 2.1 - 0.3; let angle = Math.atan2(ny, nx); let noise = Math.sin(angle * 5 + t * 2.5) * 0.15 + Math.cos(angle * 3 - t * 1.5) * 0.1; let boundary = safeRadius + noise; if (dist > boundary) { alpha = 0.7 + Math.random() * 0.3; } else { alpha = 0.1; if (dist > boundary - 0.08) alpha = 1.0; } } 
-                else if (c.type === 'launch_drop') { let cycle = t % 6; if (Math.abs(ny - 0.8) < 0.03 && Math.abs(nx) <= 0.9) alpha = Math.max(alpha, 0.4); if (Math.abs(nx) <= 0.8 && ny <= 0.8) { let ellipse_y = 0.8 - 1.6 * Math.sqrt(Math.max(0, 1 - Math.pow(nx/0.8, 2))); if (Math.abs(ny - ellipse_y) < 0.03) alpha = Math.max(alpha, 0.3); } if (cycle < 3) { let p = cycle / 3; let theta = Math.PI * (1 - p); let cap_x = 0.8 * Math.cos(theta); let cap_y = 0.8 - 1.6 * Math.sin(theta); let dx = nx - cap_x; let dy = ny - cap_y; let ang = Math.atan2(-1.6 * Math.cos(theta), 0.8 * Math.sin(theta)); let rx = dx * Math.cos(-ang) - dy * Math.sin(-ang); let ry = dx * Math.sin(-ang) + dy * Math.cos(-ang); if (Math.abs(rx) < 0.12 && Math.abs(ry) < 0.08) alpha = 1; } else if (cycle >= 3 && cycle < 3.5) { let expl_p = (cycle - 3) / 0.5; if (Math.hypot(nx - 0.8, ny - 0.8) < 0.25 * expl_p && Math.random() > expl_p) alpha = 1; } if (cycle >= 1.5 && cycle < 4.5) { let p_gli = (cycle - 1.5) / 3; let gli_y = -0.8 + 1.6 * p_gli; if (Math.abs(nx) < 0.18 && Math.abs(ny - gli_y) < 0.04) alpha = 1; if (Math.abs(nx) < 0.04 && ny >= gli_y && ny < gli_y + 0.12) alpha = 1; } else if (cycle >= 4.5 && cycle < 5.0) { let expl_p = (cycle - 4.5) / 0.5; if (Math.hypot(nx, ny - 0.8) < 0.2 * expl_p && ny <= 0.8 && Math.random() > expl_p) alpha = 1; } }
+                else if (c.type === 'launch_drop') { let cycle = t % 6; if (Math.abs(ny - 0.8) < 0.03 && Math.abs(nx) <= 0.9) alpha = Math.max(alpha, 0.4); if (Math.abs(nx) <= 0.8 && ny <= 0.8) { let ellipse_y = 0.8 - 1.6 * Math.sqrt(Math.max(0, 1 - Math.pow(nx/0.8, 2))); if (Math.abs(ny - ellipse_y) < 0.03) alpha = Math.max(alpha, 0.3); } if (cycle < 3) { let p = cycle / 3; let theta = Math.PI * (1 - p); let cap_x = 0.8 * Math.cos(theta); let cap_y = 0.8 - 1.6 * Math.sin(theta); let dx = nx - cap_x; let dy = cap_y - ny; let ang = Math.atan2(-1.6 * Math.cos(theta), 0.8 * Math.sin(theta)); let rx = dx * Math.cos(-ang) - dy * Math.sin(-ang); let ry = dx * Math.sin(-ang) + dy * Math.cos(-ang); if (Math.abs(rx) < 0.12 && Math.abs(ry) < 0.08) alpha = 1; } else if (cycle >= 3 && cycle < 3.5) { let expl_p = (cycle - 3) / 0.5; if (Math.hypot(nx - 0.8, ny - 0.8) < 0.25 * expl_p && Math.random() > expl_p) alpha = 1; } if (cycle >= 1.5 && cycle < 4.5) { let p_gli = (cycle - 1.5) / 3; let gli_y = -0.8 + 1.6 * p_gli; if (Math.abs(nx) < 0.18 && Math.abs(ny - gli_y) < 0.04) alpha = 1; if (Math.abs(nx) < 0.04 && ny >= gli_y && ny < gli_y + 0.12) alpha = 1; } else if (cycle >= 4.5 && cycle < 5.0) { let expl_p = (cycle - 4.5) / 0.5; if (Math.hypot(nx, ny - 0.8) < 0.2 * expl_p && ny <= 0.8 && Math.random() > expl_p) alpha = 1; } }
                 else if (c.type === 'weapon') { let p_alpha = 0, pk_alpha = 0; if (nx > -0.35 && nx < 0.35 && ny > -0.2 && ny < 0.0) p_alpha = 1; if (nx > -0.35 && nx < -0.1 && ny >= 0.0 && ny < 0.4) p_alpha = 1; if (nx >= -0.1 && nx < 0.1 && ny >= 0.0 && ny < 0.2) { p_alpha = 1; if (nx > -0.06 && nx < 0.06 && ny > 0.04 && ny < 0.16) p_alpha = 0; } if (Math.abs(nx + ny) < 0.06 && nx > -0.4 && nx < 0.4) pk_alpha = 1; let blade_dist = Math.abs(nx - ny - 0.3); let dist_to_cross = Math.hypot(nx - 0.15, ny + 0.15); if (blade_dist < 0.08 && dist_to_cross < 0.3) pk_alpha = 1; let cycle = (t * 0.8) % 2; let phase = cycle % 1; let scanX = (phase * 2.4) - 1.2; let distToScan = Math.abs(nx - scanX); let showPistol = (cycle < 1) ? (nx > scanX) : (nx <= scanX); let showPick = (cycle < 1) ? (nx <= scanX) : (nx > scanX); alpha = 0.1; if (showPistol && p_alpha > 0) alpha = 1.0; if (showPick && pk_alpha > 0) alpha = 1.0; if (distToScan < 0.05) { if (p_alpha > 0 || pk_alpha > 0) alpha = 1.0; else alpha = 0.3; } else if (distToScan < 0.2) { if (p_alpha > 0 || pk_alpha > 0) { let hash = Math.sin(ix * 12.9898 + iy * 78.233 + Math.floor(t*5)) * 43758.5453; if (hash - Math.floor(hash) > 0.4) alpha = 0.9; else alpha = 0.1; } } }
                 else if (c.type === 'bubble') { let groundY = 0.5; let distToCenter = Math.hypot(nx, ny - groundY); if (Math.abs(ny - groundY) < 0.03) alpha = 0.5; if (ny < groundY) { let angle = Math.atan2(ny - groundY, nx); let wave = Math.sin(angle * 6 - t * 2) * 0.05; let bubbleRadius = 0.6 + wave; if (Math.abs(distToCenter - bubbleRadius) < 0.04) alpha = 1; if (distToCenter < bubbleRadius - 0.04) { if (Math.random() > 0.85) alpha = 0.6; let scanY = -1.0 + (t % 2) * 2; if (Math.abs(ny - scanY) < 0.05) alpha = 0.9; } } }
                 else if (c.type === 'car') { let carBounce = Math.abs(Math.sin(t * 8)) * 0.03; let cy = carBounce - 0.05; let md = 999; let d2s = (x1, y1, x2, y2) => { let l2 = (x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1); if (l2 === 0) return Math.hypot(nx - x1, ny - (y1 + cy)); let t_p = Math.max(0, Math.min(1, ((nx - x1)*(x2 - x1) + (ny - (y1 + cy))*(y2 - y1)) / l2)); return Math.hypot(nx - (x1 + t_p*(x2 - x1)), ny - (y1 + cy + t_p*(y2 - y1))); }; let ln = (x1, y1, x2, y2) => { md = Math.min(md, d2s(x1, y1, x2, y2)); }; ln(-0.8, 0.0, 0.7, 0.0); ln(-0.2, -0.3, 0.2, -0.3); ln(-0.2, -0.3, -0.4, 0.0); ln(0.2, -0.3, 0.4, 0.0); ln(0.0, -0.3, 0.0, 0.0); ln(-0.8, 0.0, -0.85, 0.1); ln(-0.85, 0.1, -0.85, 0.2); ln(-0.85, 0.2, -0.8, 0.3); ln(0.7, 0.0, 0.8, 0.15); ln(0.8, 0.15, 0.8, 0.3); ln(-0.8, 0.3, -0.6, 0.3); ln(-0.6, 0.3, -0.5, 0.1); ln(-0.5, 0.1, -0.3, 0.1); ln(-0.3, 0.1, -0.2, 0.3); ln(-0.2, 0.3, 0.2, 0.3); ln(0.2, 0.3, 0.3, 0.1); ln(0.3, 0.1, 0.5, 0.1); ln(0.5, 0.1, 0.6, 0.3); ln(0.6, 0.3, 0.8, 0.3); if (md < 0.045) alpha = 1.0; let wR = 0.14; let dw1 = Math.hypot(nx - (-0.4), ny - (0.3 + cy)); let dw2 = Math.hypot(nx - 0.4, ny - (0.3 + cy)); if (Math.abs(dw1 - wR) < 0.045 || Math.abs(dw2 - wR) < 0.045) alpha = 1.0; if (dw1 < wR - 0.04) { let a = Math.atan2(ny - (0.3 + cy), nx - (-0.4)); if (Math.sin(a * 4 - t * 20) > 0.8) alpha = 0.6; } if (dw2 < wR - 0.04) { let a = Math.atan2(ny - (0.3 + cy), nx - 0.4); if (Math.sin(a * 4 - t * 20) > 0.8) alpha = 0.6; } let gY = 0.3 + cy + wR; if (Math.abs(ny - gY) < 0.03) { if ((nx * 15 + t * 20) % 2 < 1.0) alpha = Math.max(alpha, 0.5); } }
                 
-                // FF
                 else if (c.type === 'gen') { let cycle = t % 6; let max_dist = Math.max(Math.abs(nx), Math.abs(ny)); let euc_dist = Math.hypot(nx, ny); let R = 0.52; let scanX = -1.2 + (cycle / 1.5) * 2.4; let showScan = cycle < 1.5; let morph = 0; if (cycle >= 1.5 && cycle < 2.5) morph = cycle - 1.5; else if (cycle >= 2.5 && cycle < 4.5) morph = 1; else if (cycle >= 4.5 && cycle < 5.5) morph = 1 - (cycle - 4.5); morph = morph < 0.5 ? 2 * morph * morph : 1 - Math.pow(-2 * morph + 2, 2) / 2; let dist_calc; if (morph === 0) dist_calc = max_dist; else if (morph === 1) dist_calc = euc_dist; else { let p_val = 2 + Math.pow(1 - morph, 2) * 14; dist_calc = Math.pow(Math.pow(Math.abs(nx), p_val) + Math.pow(Math.abs(ny), p_val), 1 / p_val); } if (dist_calc < R) alpha = 0.9; if (showScan && Math.abs(nx - scanX) < 0.05) alpha = Math.max(alpha, 0.4); } 
                 else if (c.type === 'normals') { let cycle = (t * 0.8) % 6.5; let baseR = 0.52; let chaosNx = nx + Math.sin(iy * 12 + t * 6) * 0.15; let chaosNy = ny + Math.cos(ix * 12 + t * 6) * 0.15; let chaosDist = Math.hypot(chaosNx, chaosNy); let perfectDist = Math.hypot(nx, ny); let morph = 0; if (cycle >= 1.5 && cycle < 2.5) morph = cycle - 1.5; else if (cycle >= 2.5 && cycle < 5.0) morph = 1; else if (cycle >= 5.0 && cycle < 6.5) morph = 1 - (cycle - 5.0) / 1.5; let currentDist = chaosDist * (1 - morph) + perfectDist * morph; if (currentDist < baseR) alpha = 0.9; let ringR = -1; if (cycle < 1.5) ringR = 1.2 - (cycle / 1.5) * (1.2 - baseR - 0.02); else if (cycle >= 1.5 && cycle < 2.5) ringR = baseR + 0.02; else if (cycle >= 2.5 && cycle < 4.0) ringR = baseR + 0.02 + ((cycle - 2.5) / 1.5) * (1.2 - baseR - 0.02); if (ringR > 0 && Math.abs(perfectDist - ringR) < 0.04) alpha = Math.max(alpha, 0.4); }
                 else if (c.type === 'opt') { let cycle = t % 6; let phase = Math.floor(cycle / 2); let p = cycle % 2; let scanY = 1.2 - p * 1.2; let hash = Math.sin(ix * 12.9898 + iy * 78.233) * 43758.5453; let rnd = hash - Math.floor(hash); let isB1 = ny > -0.4 && ny < 0.5 && Math.abs(nx + 0.4) < (ny + 0.4) * 0.166; let isB2 = ny > -0.6 && ny < 0.5 && Math.abs(nx) < (ny + 0.6) * 0.136; let isB3 = ny > -0.3 && ny < 0.5 && Math.abs(nx - 0.4) < (ny + 0.3) * 0.187; let showB1 = 0, showB2 = 1, showB3 = 0; if (phase === 0) { showB1 = 1; showB3 = ny < scanY ? 1 : (rnd > (ny - scanY) * 3 ? 1 : 0); } else if (phase === 1) { showB3 = 0; showB1 = ny < scanY ? 1 : (rnd > (ny - scanY) * 3 ? 1 : 0); } else if (phase === 2) { if (ny < scanY) { showB1 = 0; showB3 = 0; } else { showB1 = rnd < (ny - scanY) * 3 ? 1 : 0; showB3 = showB1; } } let aT = 0.1; if ((isB1 && showB1) || (isB2 && showB2) || (isB3 && showB3)) aT = 0.9; if (Math.abs(ny - scanY) < 0.05) aT = Math.max(aT, 0.4); alpha = aT; }
                 else if (c.type === 'comm') { let cycle = t % 6; let hash = Math.sin(ix * 12.9898 + iy * 78.233) * 43758.5453; let rnd = hash - Math.floor(hash); let rx = (nx - ny) * 0.707; let ry = (nx + ny) * 0.707; let isWHandle = Math.abs(rx) < 0.35 && Math.abs(ry) < 0.06; let wHeadRDist = Math.hypot(rx - 0.35, ry); let isWHeadR = wHeadRDist < 0.2 && !(rx > 0.35 && Math.abs(ry) < 0.08); let wHeadLDist = Math.hypot(rx + 0.35, ry); let isWHeadL = wHeadLDist < 0.16 && wHeadLDist > 0.06; let isWrench = isWHandle || isWHeadR || isWHeadL; let isPole = Math.abs(nx + 0.3) < 0.04 && ny > -0.5 && ny < 0.6; let wave = Math.sin((nx + 0.3) * 8 - t * 4) * 0.05; let isCloth = nx > -0.3 && nx < 0.4 && ny > -0.5 + wave && ny < 0.1 + wave; let isFlag = isPole || isCloth; let commDist = Math.hypot(nx, ny); let isComm = commDist > 0.6 && commDist < 0.95 && rnd > 0.92; if (cycle < 2.0) { if (isWrench) alpha = 1.0; } else if (cycle < 3.0) { let p = cycle - 2.0; if (isWrench && rnd > p) alpha = 1.0; if (isFlag && rnd <= p) alpha = 1.0; } else if (cycle < 5.0) { if (isFlag) alpha = 1.0; if (isComm) { let flash = Math.sin(t * 8 + rnd * 20); alpha = flash > 0.5 ? 1.0 : 0.2; } } else { let p = cycle - 5.0; if (isFlag && rnd > p) alpha = 1.0; if (isWrench && rnd <= p) alpha = 1.0; } }
 
-                // RLTV
                 else if (c.type === 'rltv_upload') { let t_sec = t * 0.85; let phase = t_sec % 4; if (phase < 2.5) { let fillProgress = Math.min(1, phase / 2); let fillAngle = fillProgress * Math.PI * 2; let ang = Math.atan2(nx, -ny); if (ang < 0) ang += Math.PI * 2; let d = Math.hypot(nx, ny); if (d > 0.6 && d < 0.7) { if (ang <= fillAngle) alpha = 1.0; else alpha = 0.2; } let rot = phase * Math.PI; let rx = nx * Math.cos(rot) - ny * Math.sin(rot); let ry = nx * Math.sin(rot) + ny * Math.cos(rot); let maxDist = Math.max(Math.abs(rx), Math.abs(ry)); if (maxDist > 0.15 && maxDist < 0.22) alpha = 1.0; } else if (phase >= 2.5 && phase < 3) { alpha = 0.1; } else { let isFail = false; if (iy >= 12 && iy <= 18) { if (ix === 7 || (iy === 12 && ix >= 7 && ix <= 10) || (iy === 15 && ix >= 7 && ix <= 9)) isFail = true; if ((ix === 12 && iy >= 13) || (ix === 15 && iy >= 13) || (iy === 12 && ix >= 13 && ix <= 14) || (iy === 15 && ix >= 12 && ix <= 15)) isFail = true; if (ix === 18 || (iy === 12 && ix >= 17 && ix <= 19) || (iy === 18 && ix >= 17 && ix <= 19)) isFail = true; if (ix === 21 || (iy === 18 && ix >= 21 && ix <= 24)) isFail = true; } if (isFail) alpha = 1.0; } } 
                 else if (c.type === 'rltv_clapper') { let boardAlpha = 0; if (nx >= -0.6 && nx <= 0.6 && ny >= 0.1 && ny <= 0.6) boardAlpha = 0.7; let cycle = (t * 2) % 2; let theta = 0; if (cycle < 0.3) theta = -0.6 * (cycle / 0.3); else if (cycle < 0.7) theta = -0.6; else if (cycle < 0.8) theta = -0.6 * (1 - (cycle - 0.7) / 0.1); else theta = 0; let dx = nx - (-0.6); let dy = ny - 0.05; let rx = dx * Math.cos(-theta) - dy * Math.sin(-theta); let ry = dx * Math.sin(-theta) + dy * Math.cos(-theta); if (rx >= 0 && rx <= 1.2 && ry >= -0.15 && ry <= 0) { if ((rx * 6) % 1 > 0.5) boardAlpha = 1.0; else boardAlpha = 0.3; } if (boardAlpha > 0) alpha = Math.max(alpha, boardAlpha); }
 
@@ -227,6 +234,7 @@ const appRLTV = {
     playlist: [],
     currentIndex: 0,
     isPaused: false,
+    clockInterval: null,
     
     init() {
         if(!document.getElementById('tvScreen')) return;
@@ -241,14 +249,22 @@ const appRLTV = {
         this.volSlider.addEventListener('input', () => this.syncVol('slider'));
         this.syncVol('slider');
 
-        setInterval(() => this.updateClock(), 1000);
+        if (this.clockInterval) clearInterval(this.clockInterval);
+        this.clockInterval = setInterval(() => this.updateClock(), 1000);
         this.updateClock();
 
         this.video.addEventListener('timeupdate', () => { if(this.playlist.length > 0) this.clock.textContent = `${this.fmt(this.video.currentTime)} / ${this.fmt(this.video.duration)}`; });
         this.video.addEventListener('loadedmetadata', () => { if(this.playlist.length > 0) this.clock.textContent = `0:00 / ${this.fmt(this.video.duration)}`; });
         this.video.addEventListener('ended', () => this.changeChannel('next'));
 
-        this.fetchPlaylist();
+        if (this.playlist.length === 0) {
+            this.fetchPlaylist();
+        } else {
+            document.getElementById('tvBars').style.display = 'none';
+            document.getElementById('tvTextBox').style.display = 'none';
+            this.video.style.display = 'block';
+            this.loadVideo();
+        }
     },
 
     syncVol(source) {
