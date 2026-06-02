@@ -24,7 +24,6 @@ function applyLang(langVal) {
     langBtns.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-lang-val') === langVal));
     updateBreadcrumbsTitle();
     
-    // Обновляем плейсхолдер поиска, если он есть на странице
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.placeholder = currentLang === 'en' ? "Search" : "Поиск";
 }
@@ -37,54 +36,7 @@ applyTheme(localStorage.getItem('rl-theme') || 'system');
 applyLang(currentLang);
 
 // ============================================================
-//  АУДИО
-// ============================================================
-let sharedAudioCtx = null;
-let audioUnlocked = false;
-let lastHoverTime = 0;
-
-function playTone(type, startFreq, endFreq, maxVol, duration, attackTime = 0.003) {
-    try {
-        if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (sharedAudioCtx.state === 'suspended') { sharedAudioCtx.resume().catch(()=>{}); if (sharedAudioCtx.state === 'suspended') return; }
-        const osc = sharedAudioCtx.createOscillator(), gainNode = sharedAudioCtx.createGain();
-        osc.type = type; const now = sharedAudioCtx.currentTime;
-        osc.frequency.setValueAtTime(startFreq, now); osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
-        gainNode.gain.setValueAtTime(0, now); gainNode.gain.linearRampToValueAtTime(maxVol, now + attackTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration); gainNode.gain.linearRampToValueAtTime(0, now + duration + 0.01);
-        osc.connect(gainNode); gainNode.connect(sharedAudioCtx.destination); osc.start(now); osc.stop(now + duration + 0.02);
-    } catch (e) {}
-}
-
-function playUIHover(e) {
-    if (e && e.pointerType !== 'mouse') return;
-    if (e.currentTarget && e.currentTarget.classList.contains('active')) return;
-    const now = Date.now(); if (now - lastHoverTime < 40) return; lastHoverTime = now;
-    playTone('sine', 180, 250, 0.35, 0.04, 0.005);
-}
-
-function playUIClick(e) {
-    if (e.currentTarget && e.currentTarget.classList.contains('active') && e.currentTarget.id !== 'btnPause') return;
-    playTone('sine', 190, 150, 0.6, 0.05, 0.0025);
-}
-
-const unlockAudio = () => {
-    if (audioUnlocked) return;
-    if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().then(()=>audioUnlocked=true).catch(()=>{}); else audioUnlocked=true;
-    if (audioUnlocked) ['click', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => document.removeEventListener(evt, unlockAudio));
-};
-['click', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => document.addEventListener(evt, unlockAudio, { passive: true }));
-
-function bindAudioEvents() {
-    document.querySelectorAll('.back-btn, .toggle-btn, .nav-btn, .pn-select, .pn-input, .vol-box, .gate-btn').forEach(btn => {
-        btn.removeEventListener('pointerenter', playUIHover); btn.addEventListener('pointerenter', playUIHover);
-        btn.removeEventListener('click', playUIClick, true); btn.addEventListener('click', playUIClick, true);
-    });
-}
-
-// ============================================================
-//  РОУТЕР (SPA) И РЕНДЕР
+//  РОУТЕР (SPA) И РЕНДЕР КАРТОЧЕК
 // ============================================================
 const dynamicContent = document.getElementById('dynamicContent');
 const bcPageNameEn = document.getElementById('bcPageNameEn');
@@ -92,18 +44,22 @@ const bcPageNameRu = document.getElementById('bcPageNameRu');
 let currentHash = '';
 
 function updateBreadcrumbsTitle() {
-    if (PAGE_TITLES[currentHash]) {
-        bcPageNameEn.textContent = PAGE_TITLES[currentHash].en;
-        bcPageNameRu.textContent = PAGE_TITLES[currentHash].ru;
+    if (typeof PAGE_TITLES !== 'undefined' && PAGE_TITLES[currentHash]) {
+        if(bcPageNameEn) bcPageNameEn.textContent = PAGE_TITLES[currentHash].en;
+        if(bcPageNameRu) bcPageNameRu.textContent = PAGE_TITLES[currentHash].ru;
     }
 }
 
 function loadPage(hash) {
-    if (!PAGE_CONTENT[hash]) hash = 'rl'; // Fallback
+    // Защита, если хэш кривой
+    if (!PAGE_CONTENT[hash]) hash = 'rl'; 
     currentHash = hash;
     
     // Вставляем HTML из базы content.js
-    dynamicContent.innerHTML = PAGE_CONTENT[hash];
+    if (dynamicContent) {
+        dynamicContent.innerHTML = PAGE_CONTENT[hash];
+    }
+    
     updateBreadcrumbsTitle();
     
     // Подсвечиваем нужное меню
@@ -115,35 +71,27 @@ function loadPage(hash) {
     panelOffset = 0;
     setPanelOffset(0);
 
-    // Привязываем звук к новым элементам
-    bindAudioEvents();
-    
-    // Запускаем специфичную логику страницы
-    if (hash === 'rltv') appRLTV.init();
+    // Запускаем специфичную логику страницы (Телевизор или Патчноуты)
+    if (hash === 'rltv' && typeof appRLTV !== 'undefined') appRLTV.init();
     if (hash === 'patchnotes') initPatchnotesUI();
     
     // Перезапускаем анимации канвасов
     initCanvases();
 }
 
+// Слушаем изменения хэша в адресной строке
 window.addEventListener('hashchange', () => {
     loadPage(window.location.hash.replace('#', ''));
 });
 
-// Первичная загрузка
+// Первичная загрузка страницы
 document.addEventListener('DOMContentLoaded', () => {
     let initialHash = window.location.hash.replace('#', '') || 'rl';
     loadPage(initialHash);
-    
-    // Кнопка "назад" в шапке ведет на стартовый экран
-    document.getElementById('btnBack').addEventListener('click', (e) => {
-        e.preventDefault();
-        window.location.href = 'index.html';
-    });
 });
 
 // ============================================================
-//  СКРОЛЛ-СИСТЕМА (ЕДИНАЯ ДЛЯ ВСЕХ)
+//  СКРОЛЛ-СИСТЕМА
 // ============================================================
 const mainClip = document.getElementById('mainClip');
 const mainPanel = document.getElementById('mainPanel');
@@ -248,7 +196,6 @@ function drawConsoles() {
     animFrameId = requestAnimationFrame(drawConsoles);
 }
 
-
 // ============================================================
 //  СПЕЦИФИЧНАЯ ЛОГИКА СТРАНИЦ
 // ============================================================
@@ -259,7 +206,7 @@ function initPatchnotesUI() {
     const searchForm = document.getElementById('searchForm');
     const filterSelect = document.getElementById('filterSelect');
     
-    if(!searchInput) return; // Защита, если мы не на патчноутах
+    if(!searchInput) return;
 
     function updateInputStates() {
         if (searchInput.value.trim().length > 0) searchForm.classList.add('active-state');
@@ -332,7 +279,6 @@ const appRLTV = {
             const files = await response.json();
             this.playlist = files.filter(f => f.name.endsWith('.mp4')).map(f => f.download_url);
             
-            // Перемешиваем
             for (let i = this.playlist.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[this.playlist[i], this.playlist[j]] = [this.playlist[j], this.playlist[i]]; }
             
             if(this.playlist.length > 0) {
@@ -341,9 +287,7 @@ const appRLTV = {
                 this.video.style.display = 'block';
                 this.loadVideo();
             }
-        } catch (e) {
-            console.warn('TV playlist error', e);
-        }
+        } catch (e) { console.warn('TV playlist error', e); }
     },
 
     loadVideo() {
@@ -357,19 +301,6 @@ const appRLTV = {
         if(this.playlist.length === 0) return;
         const screen = document.getElementById('tvScreen');
         screen.classList.add('switching');
-        
-        // Звук помех
-        try {
-            if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
-            const dur = 0.5, bSize = sharedAudioCtx.sampleRate * dur, buf = sharedAudioCtx.createBuffer(1, bSize, sharedAudioCtx.sampleRate), dat = buf.getChannelData(0);
-            for (let i = 0; i < bSize; i++) dat[i] = (Math.random() * 2 - 1) * 0.1;
-            const src = sharedAudioCtx.createBufferSource(); src.buffer = buf;
-            const gn = sharedAudioCtx.createGain(); 
-            const maxV = 0.15 * (this.volSlider.value / 100);
-            gn.gain.setValueAtTime(0, sharedAudioCtx.currentTime); gn.gain.linearRampToValueAtTime(maxV, sharedAudioCtx.currentTime + 0.05); gn.gain.setValueAtTime(maxV, sharedAudioCtx.currentTime + 0.35); gn.gain.linearRampToValueAtTime(0, sharedAudioCtx.currentTime + dur);
-            src.connect(gn); gn.connect(sharedAudioCtx.destination); src.start();
-        } catch (e) {}
 
         this.video.pause();
         setTimeout(() => {

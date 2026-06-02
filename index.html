@@ -251,73 +251,6 @@
         applyTheme(savedTheme);
 
         // ============================================================
-        //  АУДИО СИСТЕМА
-        // ============================================================
-        let sharedAudioCtx = null;
-        let audioUnlocked = false;
-
-        function playTone(type, startFreq, endFreq, maxVol, duration, attackTime = 0.003) {
-            try {
-                if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (sharedAudioCtx.state === 'suspended') {
-                    sharedAudioCtx.resume().catch(() => {});
-                    if (sharedAudioCtx.state === 'suspended') return;
-                }
-                const osc = sharedAudioCtx.createOscillator();
-                const gainNode = sharedAudioCtx.createGain();
-                osc.type = type;
-                const now = sharedAudioCtx.currentTime;
-                osc.frequency.setValueAtTime(startFreq, now);
-                osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
-                gainNode.gain.setValueAtTime(0, now);
-                gainNode.gain.linearRampToValueAtTime(maxVol, now + attackTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-                gainNode.gain.linearRampToValueAtTime(0, now + duration + 0.01);
-                osc.connect(gainNode);
-                gainNode.connect(sharedAudioCtx.destination);
-                osc.start(now);
-                osc.stop(now + duration + 0.02);
-            } catch (e) {}
-        }
-
-        function playSystemStart() {
-            playTone('sine', 120, 60, 0.7, 0.6, 0.05);
-            setTimeout(() => playTone('square', 60, 30, 0.15, 0.8, 0.1), 50);
-        }
-
-        let lastHoverTime = 0;
-        function playUIHover(e) {
-            if (e && e.pointerType !== 'mouse') return;
-            if (e.currentTarget && e.currentTarget.classList.contains('active')) return;
-            const now = Date.now();
-            if (now - lastHoverTime < 40) return;
-            lastHoverTime = now;
-            playTone('sine', 180, 250, 0.35, 0.04, 0.005);
-        }
-
-        function playUIClick(e) {
-            if (e.currentTarget && e.currentTarget.classList.contains('active')) return;
-            playTone('sine', 190, 150, 0.6, 0.05, 0.0025);
-        }
-
-        const unlockAudio = () => {
-            if (audioUnlocked) return;
-            if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (sharedAudioCtx.state === 'suspended') {
-                sharedAudioCtx.resume().then(() => { audioUnlocked = true; }).catch(() => {});
-            } else { audioUnlocked = true; }
-            if (audioUnlocked) {
-                ['click', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => document.removeEventListener(evt, unlockAudio));
-            }
-        };
-        ['click', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => document.addEventListener(evt, unlockAudio, { passive: true }));
-
-        document.querySelectorAll('.toggle-btn, .gate-btn').forEach(btn => {
-            btn.addEventListener('pointerenter', playUIHover);
-            if(btn.classList.contains('toggle-btn')) btn.addEventListener('click', playUIClick, true);
-        });
-
-        // ============================================================
         // ИНТЕРАКТИВНЫЙ КАНВАС
         // ============================================================
         const canvas = document.getElementById('intro-canvas');
@@ -386,7 +319,6 @@
                 if (isEntering) return;
                 isEntering = true;
                 
-                playSystemStart();
                 btn.classList.add('entering');
                 
                 const lang = btn.getAttribute('data-lang-entry');
