@@ -639,20 +639,16 @@
         });
 
         // ============================================================
-        //  SPA РОУТЕР (ИСПРАВЛЕННАЯ БЕСШОВНАЯ НАВИГАЦИЯ)
+        //  SPA РОУТЕР (ПЛАВНЫЙ И МОЛНИЕНОСНЫЙ)
         // ============================================================
         function initSpaNavigation() {
-            // Вешаем обработчик ОДИН раз на весь body (делегирование событий).
-            // Это решает проблему лагов и зависаний на телефонах.
             document.body.addEventListener('click', async (e) => {
                 const link = e.target.closest('.sidebar a.nav-btn, .lang-group a.toggle-btn');
                 
-                // Если клик не по нужной ссылке, внешняя ссылка или текущая страница - игнорируем
                 if (!link) return;
                 const url = link.getAttribute('href');
                 if (!url || url.includes('index.html') || url.startsWith('http') || url.startsWith('#')) return;
                 
-                // Предотвращаем перезагрузку, если мы уже на этой странице
                 const currentPath = window.location.pathname.split('/').pop() || 'index.html';
                 const targetPath = url.split('/').pop();
                 if (currentPath === targetPath) {
@@ -661,6 +657,16 @@
                 }
                 
                 e.preventDefault(); 
+
+                // УЛУЧШЕНИЕ 1: Мгновенный отклик кнопок (Optimistic UI)
+                if (link.classList.contains('nav-btn')) {
+                    document.querySelectorAll('.sidebar a.nav-btn').forEach(btn => btn.classList.remove('active'));
+                    link.classList.add('active');
+                }
+                if (link.closest('.lang-group')) {
+                    document.querySelectorAll('.lang-group .toggle-btn').forEach(btn => btn.classList.remove('active'));
+                    link.classList.add('active');
+                }
                 
                 const cardsLayout = document.querySelector('.cards-layout');
                 if(cardsLayout) cardsLayout.classList.add('fade-out');
@@ -672,7 +678,7 @@
                     const doc = parser.parseFromString(html, 'text/html');
                     
                     setTimeout(() => {
-                        // 1. Обновляем контент
+                        // Обновляем контент
                         const newCards = doc.querySelector('.cards-layout');
                         if(newCards) cardsLayout.innerHTML = newCards.innerHTML;
                         
@@ -684,7 +690,7 @@
                         
                         document.title = doc.title;
 
-                        // 2. ИСПРАВЛЕНИЕ ГРАДИЕНТОВ: Копируем стили из <head> загруженной страницы
+                        // Перенос стилей (для градиентов)
                         const currentStyles = document.querySelectorAll('head style');
                         const newStyles = doc.querySelectorAll('head style');
                         currentStyles.forEach((style, index) => {
@@ -693,26 +699,20 @@
                             }
                         });
                         
-                        // 3. Обновляем активную кнопку в меню
-                        document.querySelectorAll('.sidebar a.nav-btn').forEach(btn => btn.classList.remove('active'));
-                        const newActiveBtn = document.querySelector(`.sidebar a[href="${url}"]`);
-                        if (newActiveBtn) newActiveBtn.classList.add('active');
-                        
                         window.history.pushState({ path: url }, '', url);
                         
                         setPanelOffset(0);
                         initCanvases();
+                        updateVSlider(); 
                         
-                        // ВАЖНО: Мы больше не вызываем initSpaNavigation() здесь, чтобы не плодить баги!
-                        
-                        requestAnimationFrame(() => {
+                        // УЛУЧШЕНИЕ 2: Плавное появление (микро-задержка для браузера)
+                        setTimeout(() => {
                             if(cardsLayout) cardsLayout.classList.remove('fade-out');
-                            updateVSlider(); 
-                        });
+                        }, 50);
+                        
                     }, 300);
                     
                 } catch (err) {
-                    // Если fetch не удался (например, нет сети), переходим по старинке
                     window.location.href = url;
                 }
             });
