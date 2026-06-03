@@ -227,7 +227,7 @@
         applyTheme(savedTheme);
 
         // ============================================================
-        // ИНТЕРАКТИВНЫЙ КАНВАС (ОБНОВЛЕННЫЙ С ТАЧ-СОБЫТИЯМИ)
+        // ИНТЕРАКТИВНЫЙ КАНВАС (С ПОДДЕРЖКОЙ ТАЧЕЙ И РАЗМЕРА ЭКРАНА)
         // ============================================================
         const canvas = document.getElementById('intro-canvas');
         const ctx = canvas.getContext('2d');
@@ -267,23 +267,37 @@
 
         window.addEventListener('resize', initCanvas);
 
-        // --- СОБЫТИЯ МЫШИ (ПК) ---
-        window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
-        window.addEventListener('mouseout', () => { mouseX = -1000; mouseY = -1000; });
+        // Объявляем переменную для защиты от фантомных кликов
+        let lastTouchTime = 0;
 
         // --- СОБЫТИЯ КАСАНИЯ (СЕНСОРНЫЕ ЭКРАНЫ) ---
         window.addEventListener('touchstart', (e) => { 
+            lastTouchTime = Date.now();
             mouseX = e.touches[0].clientX; 
             mouseY = e.touches[0].clientY; 
         }, { passive: true });
         
         window.addEventListener('touchmove', (e) => { 
+            lastTouchTime = Date.now();
             mouseX = e.touches[0].clientX; 
             mouseY = e.touches[0].clientY; 
         }, { passive: true });
         
-        window.addEventListener('touchend', () => { mouseX = -1000; mouseY = -1000; }); // Убираем эффект, когда палец оторван
-        window.addEventListener('touchcancel', () => { mouseX = -1000; mouseY = -1000; }); // На случай системных прерываний
+        window.addEventListener('touchend', () => { 
+            lastTouchTime = Date.now();
+            mouseX = -1000; mouseY = -1000; 
+        }); 
+        window.addEventListener('touchcancel', () => { 
+            mouseX = -1000; mouseY = -1000; 
+        }); 
+
+        // --- СОБЫТИЯ МЫШИ (ПК) ---
+        window.addEventListener('mousemove', (e) => { 
+            // Игнорируем "фантомную" мышь от мобильного браузера в течение 500мс после тапа
+            if (Date.now() - lastTouchTime < 500) return;
+            mouseX = e.clientX; mouseY = e.clientY; 
+        });
+        window.addEventListener('mouseout', () => { mouseX = -1000; mouseY = -1000; });
 
         initCanvas();
 
