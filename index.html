@@ -195,6 +195,9 @@
     </div>
 
     <script>
+        // ============================================================
+        // ТЕМЫ
+        // ============================================================
         const rootTheme = document.documentElement;
         let currentCanvasColor = '180, 190, 205'; 
         const themeBtns = document.querySelectorAll('.theme-group .toggle-btn');
@@ -223,6 +226,9 @@
         try { savedTheme = localStorage.getItem('rl-theme') || 'system'; } catch(e) {}
         applyTheme(savedTheme);
 
+        // ============================================================
+        // ИНТЕРАКТИВНЫЙ КАНВАС (ОБНОВЛЕННЫЙ С ТАЧ-СОБЫТИЯМИ)
+        // ============================================================
         const canvas = document.getElementById('intro-canvas');
         const ctx = canvas.getContext('2d');
         let width, height;
@@ -232,6 +238,11 @@
         let mouseX = -1000, mouseY = -1000;
         let isEntering = false;
 
+        // Переменные для настройки размера под разные экраны
+        let influenceRadius = 200; 
+        let baseDotRadius = 0.8;   
+        let maxDotRadius = 3.2;    
+
         function initCanvas() {
             const dpr = window.devicePixelRatio || 1;
             width = window.innerWidth; height = window.innerHeight;
@@ -240,11 +251,39 @@
             
             cols = Math.ceil(width / spacing) + 1;
             rows = Math.ceil(height / spacing) + 1;
+
+            // Если экран мобильный (уменьшаем радиус и размер точек)
+            if (width <= 900) {
+                influenceRadius = 100; // Радиус свечения в 2 раза меньше
+                baseDotRadius = 0.5;   // Сами точки чуть меньше
+                maxDotRadius = 1.5;    // Увеличиваются не так сильно
+            } else {
+                // Возвращаем дефолтные значения для ПК
+                influenceRadius = 200;
+                baseDotRadius = 0.8;
+                maxDotRadius = 3.2;
+            }
         }
 
         window.addEventListener('resize', initCanvas);
+
+        // --- СОБЫТИЯ МЫШИ (ПК) ---
         window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
         window.addEventListener('mouseout', () => { mouseX = -1000; mouseY = -1000; });
+
+        // --- СОБЫТИЯ КАСАНИЯ (СЕНСОРНЫЕ ЭКРАНЫ) ---
+        window.addEventListener('touchstart', (e) => { 
+            mouseX = e.touches[0].clientX; 
+            mouseY = e.touches[0].clientY; 
+        }, { passive: true });
+        
+        window.addEventListener('touchmove', (e) => { 
+            mouseX = e.touches[0].clientX; 
+            mouseY = e.touches[0].clientY; 
+        }, { passive: true });
+        
+        window.addEventListener('touchend', () => { mouseX = -1000; mouseY = -1000; }); // Убираем эффект, когда палец оторван
+        window.addEventListener('touchcancel', () => { mouseX = -1000; mouseY = -1000; }); // На случай системных прерываний
 
         initCanvas();
 
@@ -260,10 +299,12 @@
                     let dy = mouseY - y;
                     let dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    let mouseInfluence = Math.max(0, 1 - dist / 200); 
+                    // Используем динамический радиус
+                    let mouseInfluence = Math.max(0, 1 - dist / influenceRadius); 
                     let intensity = mouseInfluence * mouseInfluence * (3 - 2 * mouseInfluence);
                     
-                    let radius = 0.8 + intensity * 3.2; 
+                    // Используем динамические размеры точек
+                    let radius = baseDotRadius + intensity * maxDotRadius; 
                     let alpha = 0.05 + intensity * 0.95; 
 
                     ctx.fillStyle = `rgba(${currentCanvasColor}, ${alpha})`;
@@ -279,6 +320,9 @@
         }
         drawGrid();
 
+        // ============================================================
+        // ЛОГИКА ВХОДА
+        // ============================================================
         const gateBtns = document.querySelectorAll('.gate-btn');
 
         gateBtns.forEach(btn => {
