@@ -181,10 +181,19 @@
         // ВОССТАНОВЛЕНИЕ ПРИ СВАЙПЕ НАЗАД (BFCache)
         // ============================================================
         window.addEventListener('pageshow', (event) => {
-            // Если страница загружена из кэша (нажали кнопку "Назад" в браузере или свайпнули)
             if (event.persisted) {
                 document.body.classList.remove('transitioning');
-                isEntering = false;
+                
+                // Если мы уходили, анимация останавливалась. Перезапускаем её!
+                if (isEntering) {
+                    isEntering = false;
+                    drawGrid(); // Снова заводим мотор канваса
+                }
+                
+                // Сбрасываем все прошлые нажатия, чтобы на экране не зависло старое пятно
+                mouseX = -1000; 
+                mouseY = -1000;
+                activePointers = [];
                 
                 // Убираем залипание с кнопок языков
                 document.querySelectorAll('.gate-btn').forEach(btn => {
