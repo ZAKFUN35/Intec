@@ -48,6 +48,9 @@
            СБРОС СТИЛЕЙ И БАЗА
         ============================================================ */
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        *:focus {
+            outline: none !important;
+        }
         
         body, html {
             width: 100vw; height: 100vh; height: 100dvh;
@@ -174,6 +177,21 @@
             if (isLight) document.documentElement.setAttribute('data-theme', 'light');
             else document.documentElement.removeAttribute('data-theme');
         } catch(e) {}
+        // ============================================================
+        // ВОССТАНОВЛЕНИЕ ПРИ СВАЙПЕ НАЗАД (BFCache)
+        // ============================================================
+        window.addEventListener('pageshow', (event) => {
+            // Если страница загружена из кэша (нажали кнопку "Назад" в браузере или свайпнули)
+            if (event.persisted) {
+                document.body.classList.remove('transitioning');
+                isEntering = false;
+                
+                // Убираем залипание с кнопок языков
+                document.querySelectorAll('.gate-btn').forEach(btn => {
+                    btn.classList.remove('entering');
+                });
+            }
+        });
     </script>
 </head>
 <body>

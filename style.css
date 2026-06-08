@@ -45,6 +45,9 @@ svg { transition: stroke 0.1s ease, fill 0.1s ease; }
 
 /* БАЗА */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+*:focus {
+    outline: none !important;
+}
 
 body, html { 
     width: 100vw; height: 100vh; height: 100dvh; 

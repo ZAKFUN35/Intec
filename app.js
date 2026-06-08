@@ -106,13 +106,22 @@ applyLang(currentLang);
 //  РОУТЕР (SPA) И РЕНДЕР КАРТОЧЕК
 // ============================================================
 function loadPage(hash) {
-    // 1. Очистка старой страницы (ставим видео ТВ на паузу, если уходим с вкладки)
+    // 1. Очистка старой страницы
     if (currentHash === 'rltv' && typeof appRLTV !== 'undefined' && appRLTV.video) {
         appRLTV.video.pause();
     }
 
     // 2. Защита, если хэш кривой
     if (!PAGE_CONTENT[hash]) hash = 'rl'; 
+    
+    // --- ДОБАВКА ДЛЯ ИДЕАЛЬНЫХ СВАЙПОВ ---
+    // Если хэша не было в адресной строке, принудительно его дописываем,
+    // чтобы история браузера не путалась при свайпе "Назад"
+    if (window.location.hash !== `#${hash}`) {
+        window.history.replaceState(null, '', `#${hash}`);
+    }
+    // -------------------------------------
+
     currentHash = hash;
     
     // 3. Вставляем HTML из базы content.js
